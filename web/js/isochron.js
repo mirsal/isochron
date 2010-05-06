@@ -3,13 +3,15 @@ var container;
 var zoom = 9;
 var centerPoint = new GLatLng(45.7,4.9);
 var centerMarker;
-var pointInterval = 30;
+var pointInterval = 10;
 var maxRadius = 1;
+var requestDelay = 30;
+var maxSpeed = 90;
 
 var computations = [
-    {dist: 40, color: '#ff0000'},
-    {dist: 30, color: '#ffff00'},
-    {dist: 20, color: '#00ff00'}
+    {time: 45, color: '#ff0000'},
+    {time: 30, color: '#ffff00'},
+    {time: 15, color: '#00ff00'}
 ]
 
 window.onload = load;
@@ -40,6 +42,46 @@ function load() {
 	}
 }
 
+function RequestQueue() {
+    this._requests = [];
+    this._status = 'IDLE';
+
+    this.pushRequest = function(r) {
+        this._requests.push(r);
+
+        if('IDLE' == this._status) {
+            this.start();
+        }
+    };
+
+    this.start = function() {
+
+        if(('RUNNING' == this._status) || (0 == this._requests.length)) {
+            GLog.write('Error: queue is empty or already running');
+            return false;
+        }
+
+        this._status = 'RUNNING';
+        var request = this._requests.shift();
+        request();
+        return true;
+
+    };
+
+    this.finish = function() {
+
+        if(0 == this._requests.length) {
+            this._status = 'IDLE';
+            return;
+        }
+
+        this._status = 'WAITING';
+        setTimeout('rq.start()', requestDelay);
+
+    };
+}
+
+var rq = new RequestQueue();
 
 function mapClick(ov,pt) {
     map.clearOverlays();
@@ -53,14 +95,20 @@ function mapClick(ov,pt) {
 	}
 	map.addOverlay(centerMarker);
 
+    if(0 == computations.length) {
+        return;
+    }
+
 	for (var i in computations) {
-	    maxRadius = Math.max(computations[i].dist, maxRadius);
 	    runComputation(pt, computations[i]);
 	}
 }
 
 function runComputation(pt, computation) {
     var dirObj = new GDirections();
+    var upperDistBound = ((computation.time / 60) * maxSpeed).toFixed(2);
+
+    maxRadius = Math.max(upperDistBound, maxRadius);
 
 	dirObj.currentComputation = computation;
     dirObj.currentComputation.circleMarkers = Array();
@@ -71,7 +119,7 @@ function runComputation(pt, computation) {
     GEvent.addListener(dirObj, "load", onDirectionsLoad);
     GEvent.addListener(dirObj, "error", onDirectionsError);
 
-	dirObj.currentComputation.searchPoints = getCirclePoints(pt,computation.dist);
+	dirObj.currentComputation.searchPoints = getCirclePoints(pt, upperDistBound);
 
 	dirObj.currentComputation.drivePolyPoints = Array();
 	getDirections(dirObj);
@@ -95,11 +143,10 @@ function getCirclePoints(center,radius){
 				searchPoints.push(point);
 			}
 		}
-		GLog.write('Points : ' + searchPoints.length);
 	}
 
 	var searchPolygon = new GPolygon(circlePoints, '#0000ff', 1, 1, '#0000ff', 0.1);	
-	//map.addOverlay(searchPolygon);
+	map.addOverlay(searchPolygon);
 	if(radius >= maxRadius) {
 	    map.setCenter(searchPolygon.getBounds().getCenter(),map.getBoundsZoomLevel(searchPolygon.getBounds()));
     }
@@ -116,21 +163,31 @@ function getDirections(dirObj) {
 	dirObj.currentComputation.searchPoints.shift();
 
 	var loadStr = 'from: ' + from + ' to: ' + to;
-	dirObj.load(loadStr,{getPolyline:true,getSteps:true});
+
+	rq.pushRequest(function() {
+	    dirObj.load(loadStr,{getPolyline:true,getSteps:true});
+	});
 }
 
 function onDirectionsLoad() {
 	var status = this.getStatus();
 	var bounds = this.getBounds();
-	var distance = parseInt(this.getDistance().meters / 1609);
-	var duration = parseFloat(this.getDuration().seconds / 3600).toFixed(2);
+	var distance = parseInt(this.getDistance().meters);
+	var duration = parseFloat(this.getDuration().seconds).toFixed(2);
 	var polyline = this.getPolyline();
+
+    if(undefined == this.currentComputation.medianSpeed) {
+	    this.currentComputation.medianSpeed = distance / duration;
+	}
+
 	shortenAndShow(this.currentComputation, polyline);
 	getDirections(this);
+
+	rq.finish();
 }
 
 function shortenAndShow(computation, polyline) {
-	var distToDriveM = computation.dist * 1000;
+	var distToDriveM = (computation.time * 60) * computation.medianSpeed;
 	var dist = 0;
 	var cutoffIndex = 0;
 	var copyPoints = Array();
@@ -151,15 +208,13 @@ function shortenAndShow(computation, polyline) {
 	map.addOverlay(newLine);
 
 	computation.drivePolyPoints.push(lastPoint);
-	addBorderMarker(computation, lastPoint, dist)
-	//if (computation.drivePolyPoints.length > 3) {
-		if (computation.drivePolygon) {
-			map.removeOverlay(computation.drivePolygon);
-		}
-		computation.drivePolygon = new GPolygon(computation.drivePolyPoints,
-		    computation.color, 1, 1, computation.color, 0.4);	
-		map.addOverlay(computation.drivePolygon);
-	//}
+	//addBorderMarker(computation, lastPoint, dist)
+	if (computation.drivePolygon) {
+		map.removeOverlay(computation.drivePolygon);
+	}
+	computation.drivePolygon = new GPolygon(computation.drivePolyPoints,
+	    computation.color, 1, 1, computation.color, 0.4);	
+	map.addOverlay(computation.drivePolygon);
 }
 
 function addBorderMarker(computation, pt, d) {
