@@ -3,10 +3,10 @@ var container;
 var zoom = 9;
 var centerPoint = new GLatLng(45.7,4.9);
 var centerMarker;
-var pointInterval = 10;
+var pointInterval = 2;
 var maxRadius = 1;
 var requestDelay = 30;
-var maxSpeed = 90;
+var maxSpeed = 45;
 
 var computations = [
     {time: 45, color: '#ff0000'},
@@ -230,7 +230,8 @@ function onDirectionsError() {
     } else {
 	    GLog.write('Error: ' + this.getStatus().code);    
     }
-	getDirections(this);
+	//getDirections(this);
+	rq.finish();
 }
 
 function unload() {
