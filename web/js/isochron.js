@@ -1,18 +1,17 @@
 var map;
 var container;
-var zoom = 9;
-var centerPoint = new GLatLng(45.7,4.9);
+var centerPoint;
 var centerMarker;
-var pointInterval = 2;
+var zoom = 9;
 var maxRadius = 1;
-var requestDelay = 30;
-var maxSpeed = 45;
 
-var computations = [
-    {time: 45, color: '#ff0000'},
-    {time: 30, color: '#ffff00'},
-    {time: 15, color: '#00ff00'}
-]
+var computations = [];
+var config = {
+    center: { address: 'Aubenas, France'},
+    pointInterval: 2,
+    requestDelay: 30,
+    maxSpeed: 45
+};
 
 window.onload = load;
 window.onunload = unload;
@@ -23,24 +22,6 @@ baseIcon2.iconAnchor=new GPoint(4,4);
 baseIcon2.infoWindowAnchor=new GPoint(4,0);
 var redIcon8 = (new GIcon(baseIcon2, "/images/redSquare_8.png", null, ""));
 
-function load() {
-	if (GBrowserIsCompatible()) {
-		container = document.getElementById("map");
-		map = new GMap2(container, {draggableCursor:"crosshair"});
-		map.addMapType(G_PHYSICAL_MAP)
-
-		map.setCenter(centerPoint, zoom, G_PHYSICAL_MAP);
-
-		map.addControl(new GScaleControl());
-		map.addControl(new GLargeMapControl());
-		map.addControl(new GMapTypeControl());
-
-		map.enableContinuousZoom();
-		map.enableScrollWheelZoom();		
-
-		GEvent.addListener(map, "click", mapClick);
-	}
-}
 
 function RequestQueue() {
     this._requests = [];
@@ -76,37 +57,113 @@ function RequestQueue() {
         }
 
         this._status = 'WAITING';
-        setTimeout('rq.start()', requestDelay);
+        setTimeout('rq.start()', config.requestDelay);
 
     };
 }
 
 var rq = new RequestQueue();
 
-function mapClick(ov,pt) {
-    map.clearOverlays();
+function load() {
+	if (GBrowserIsCompatible()) {
+		container = document.getElementById("map");
 
-	if (!centerMarker) {
-		centerMarker = new GMarker(pt);
-	}
-	else {
-		map.removeOverlay(centerMarker);
-		centerMarker.setPoint(pt);
-	}
-	map.addOverlay(centerMarker);
+        var payload = "";
+        for(var i in container.childNodes) {
+            if(container.childNodes[i].nodeValue) {
+                payload += container.childNodes[i].nodeValue;
+            }
+        }
 
-    if(0 == computations.length) {
-        return;
+        var userData = JSON.parse(payload);
+        var geoData = userData.datapoints;
+        computations = userData.computations;
+
+        for (var attr in userData.config) {
+
+            if(userData.config.hasOwnProperty(attr)) {
+                config[attr] = userData.config[attr];
+            }
+
+        }
+        
+        var geocoder = new GClientGeocoder();
+
+		map = new GMap2(container, {draggableCursor:"crosshair"});
+		map.addMapType(G_PHYSICAL_MAP)
+
+		map.addControl(new GScaleControl());
+		map.addControl(new GLargeMapControl());
+		map.addControl(new GMapTypeControl());
+
+		map.enableContinuousZoom();
+		map.enableScrollWheelZoom();		
+
+		GEvent.addListener(map, "click", mapClick);
+
+        var addGeocodedDatapoint = function(address, title) {
+	        rq.pushRequest(function() {
+	            //GLog.write('Adding: ' + title + ' @ ' + address);
+	            geocoder.getLatLng(address, function(point) {
+                    if(point) {
+                        var marker = new GMarker(point);
+                        map.addOverlay(marker);
+                        GEvent.addListener(marker, "click", function() {
+                            marker.openInfoWindowHtml(title);
+                        });
+                    }
+
+                    rq.finish();
+	            });
+	        });
+        };
+
+        geocoder.getLatLng(config.center.address, function(point) {
+            centerPoint = point;
+		    map.setCenter(centerPoint, zoom, G_PHYSICAL_MAP);
+
+	        if (!centerMarker) {
+		        centerMarker = new GMarker(point);
+	        }
+
+	        else {
+		        map.removeOverlay(centerMarker);
+		        centerMarker.setPoint(point);
+	        }
+
+	        map.addOverlay(centerMarker);
+
+            if(0 == computations.length) {
+                return;
+            }
+
+	        for (var i in computations) {
+	            runComputation(point, computations[i]);
+	        }
+        });
+	}
+	
+	for(var i in geoData) {
+
+	    if(undefined != geoData[i].lat && undefined != geoData[i].lng) {
+            var point = new GLatLng(geoData[i].lat, geoData[i].lng);
+            map.addOverlay(new GMarker(point));
+	    }
+
+	    else if(undefined != geoData[i].address) {
+            addGeocodedDatapoint(geoData[i].address, geoData[i].title);
+	    }
+
     }
+}
 
-	for (var i in computations) {
-	    runComputation(pt, computations[i]);
-	}
+function mapClick(ov,pt) {
+//    map.clearOverlays();
 }
 
 function runComputation(pt, computation) {
     var dirObj = new GDirections();
-    var upperDistBound = ((computation.time / 60) * maxSpeed).toFixed(2);
+    var upperDistBound = ((computation.time / 60) * config.maxSpeed).toFixed(2);
 
     maxRadius = Math.max(upperDistBound, maxRadius);
 
@@ -139,7 +196,7 @@ function getCirclePoints(center,radius){
 			var y = center.lat() + (rLat * sin(aRad));
 			var point = new GLatLng(parseFloat(y),parseFloat(x),true);
 			circlePoints.push(point);
-			if (a % pointInterval == 0) {
+			if (a % config.pointInterval == 0) {
 				searchPoints.push(point);
 			}
 		}

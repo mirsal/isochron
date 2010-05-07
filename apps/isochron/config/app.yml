@@ -4,3 +4,17 @@
 all:
   gmaps:
     key: "ABQIAAAAC0HREQWV9s6VzAHP-J9_3RTBM8BnLg5xXwzq4WzdXy0Ua977yhRDzuXG6x1rfL2qTy79ssRgBwryAA"
+
+  isochron:
+    country: FRANCE
+    datafile: tpcd_geo.csv
+    config:
+      center: { address: "Aubenas, FRANCE" }
+      requestDelay:  60
+      maxSpeed:      45
+      pointInterval: 10
+
+    computations:
+      - { time: 45, color: "#ff0000" }
+      - { time: 30, color: "#ffff00" }
+      - { time: 15, color: "#00ff00" }
