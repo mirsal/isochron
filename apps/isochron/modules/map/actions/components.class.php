@@ -19,6 +19,7 @@ class mapComponents extends sfComponents
         {
             $datapoints[] = array(
                 'title' => preg_replace('/[^a-zA-Z0-9-]/', ' ', $line[1]),
+                'image' => (isset($line[14]) and $line[14]) ? $line[14] : null,
                 'address' => preg_replace('/[^a-zA-Z0-9-]/', ' ',
                     sprintf('%s %s, %s', $line[6], $line[8], sfConfig::get('app_isochron_country')))
             );

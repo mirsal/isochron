@@ -9,10 +9,14 @@ all:
     country: FRANCE
     datafile: tpcd_geo.csv
     config:
-      center: { address: "Aubenas, FRANCE" }
+      center: { address: "Aubenas, France" }
       requestDelay:  60
       maxSpeed:      45
       pointInterval: 10
+      showSearchRadius:   false
+      showComputedRoutes: false
+      showBorderMarkers:  false
+      prioritizeRouteCalculations: true
 
     computations:
       - { time: 45, color: "#ff0000" }

@@ -10,11 +10,20 @@ var config = {
     center: { address: 'Aubenas, France'},
     pointInterval: 2,
     requestDelay: 30,
-    maxSpeed: 45
+    maxSpeed: 45,
+    showSearchRadius: true,
+    showComputedRoutes: true,
+    showBorderMarkers: true,
+    prioritizeRouteCalculations: true
 };
 
 window.onload = load;
 window.onunload = unload;
+
+var baseIcon = new GIcon();
+baseIcon.iconSize = new GSize(16,16);
+baseIcon.iconAnchor = new GPoint(8,8);
+baseIcon.infoWindowAnchor = new GPoint(8,0);
 
 var baseIcon2 = new GIcon();
 baseIcon2.iconSize=new GSize(8,8);
@@ -22,13 +31,16 @@ baseIcon2.iconAnchor=new GPoint(4,4);
 baseIcon2.infoWindowAnchor=new GPoint(4,0);
 var redIcon8 = (new GIcon(baseIcon2, "/images/redSquare_8.png", null, ""));
 
-
 function RequestQueue() {
     this._requests = [];
     this._status = 'IDLE';
 
-    this.pushRequest = function(r) {
-        this._requests.push(r);
+    this.pushRequest = function(r, prio) {
+        if(prio) {
+            this._requests.unshift(r);
+        } else {
+            this._requests.push(r);
+        }
 
         if('IDLE' == this._status) {
             this.start();
@@ -94,6 +106,7 @@ function load() {
 
 		map.addControl(new GScaleControl());
 		map.addControl(new GLargeMapControl());
+		map.addControl(new GOverviewMapControl());
 		map.addControl(new GMapTypeControl());
 
 		map.enableContinuousZoom();
@@ -101,16 +114,23 @@ function load() {
 
 		GEvent.addListener(map, "click", mapClick);
 
-        var addGeocodedDatapoint = function(address, title) {
+        var addGeocodedDatapoint = function(address, title, image) {
 	        rq.pushRequest(function() {
-	            //GLog.write('Adding: ' + title + ' @ ' + address);
 	            geocoder.getLatLng(address, function(point) {
                     if(point) {
-                        var marker = new GMarker(point);
+
+                        if(image) {
+                            var icon = new GIcon(baseIcon, image);
+                            var marker = new GMarker(point, { icon: icon });
+                        } else {
+                            var marker = new GMarker(point);
+                        }
+
                         map.addOverlay(marker);
                         GEvent.addListener(marker, "click", function() {
                             marker.openInfoWindowHtml(title);
                         });
+
                     }
 
                     rq.finish();
@@ -151,7 +171,7 @@ function load() {
 	    }
 
 	    else if(undefined != geoData[i].address) {
-            addGeocodedDatapoint(geoData[i].address, geoData[i].title);
+            addGeocodedDatapoint(geoData[i].address, geoData[i].title, geoData[i].image);
 	    }
 
     }
@@ -203,7 +223,11 @@ function getCirclePoints(center,radius){
 	}
 
 	var searchPolygon = new GPolygon(circlePoints, '#0000ff', 1, 1, '#0000ff', 0.1);	
-	map.addOverlay(searchPolygon);
+
+    if(config.showSearchRadius) {
+	    map.addOverlay(searchPolygon);
+    }
+
 	if(radius >= maxRadius) {
 	    map.setCenter(searchPolygon.getBounds().getCenter(),map.getBoundsZoomLevel(searchPolygon.getBounds()));
     }
@@ -223,7 +247,7 @@ function getDirections(dirObj) {
 
 	rq.pushRequest(function() {
 	    dirObj.load(loadStr,{getPolyline:true,getSteps:true});
-	});
+	}, config.prioritizeRouteCalculations);
 }
 
 function onDirectionsLoad() {
@@ -262,16 +286,24 @@ function shortenAndShow(computation, polyline) {
 
 	var lastPoint = copyPoints[copyPoints.length-1];
 	var newLine = new GPolyline(copyPoints, '#ff0000', 2, 1);
-	map.addOverlay(newLine);
+
+    if(config.showComputedRoutes) {
+	    map.addOverlay(newLine);
+    }
 
 	computation.drivePolyPoints.push(lastPoint);
-	//addBorderMarker(computation, lastPoint, dist)
+
+    if(config.showBorderMarkers) {
+        addBorderMarker(computation, lastPoint, dist)
+    }
+
 	if (computation.drivePolygon) {
 		map.removeOverlay(computation.drivePolygon);
 	}
 	computation.drivePolygon = new GPolygon(computation.drivePolyPoints,
 	    computation.color, 1, 1, computation.color, 0.4);	
-	map.addOverlay(computation.drivePolygon);
+
+    map.addOverlay(computation.drivePolygon);
 }
 
 function addBorderMarker(computation, pt, d) {
