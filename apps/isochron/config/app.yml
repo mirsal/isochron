@@ -10,7 +10,7 @@ all:
     datafile: tpcd_geo.csv
     config:
       center: { address: "Aubenas, France" }
-      requestDelay:  60
+      requestDelay:  100
       maxSpeed:      45
       pointInterval: 10
       showSearchRadius:   false
