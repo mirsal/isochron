@@ -16,7 +16,8 @@ all:
       showSearchRadius:   false
       showComputedRoutes: false
       showBorderMarkers:  false
-      prioritizeRouteCalculations: true
+      prioritizeRouteCalculations: true,
+      maxGeocodingDist: 100
 
     computations:
       - { time: 45, color: "#ff0000" }

@@ -14,7 +14,8 @@ var config = {
     showSearchRadius: true,
     showComputedRoutes: true,
     showBorderMarkers: true,
-    prioritizeRouteCalculations: true
+    prioritizeRouteCalculations: true,
+    maxGeocodingDist: 100
 };
 
 window.onload = load;
@@ -117,7 +118,9 @@ function load() {
         var addGeocodedDatapoint = function(address, title, image) {
 	        rq.pushRequest(function() {
 	            geocoder.getLatLng(address, function(point) {
-                    if(point) {
+                    if(point &&
+                        (!centerPoint ||
+                            (point.distanceFrom(centerPoint) <= (config.maxGeocodingDist * 1000)))) {
 
                         if(image) {
                             var icon = new GIcon(baseIcon, image);
