@@ -20,6 +20,6 @@ all:
       maxGeocodingDist: 100
 
     computations:
-      - { time: 45, color: "#ff0000" }
-      - { time: 30, color: "#ffff00" }
       - { time: 15, color: "#00ff00" }
+      - { time: 30, color: "#ffff00" }
+      - { time: 45, color: "#ff0000" }
